@@ -60,7 +60,6 @@ class AVDisplayView: NSView {
         videoLayer.frame = bounds
         videoLayer.videoGravity = .resizeAspectFill
         layer?.addSublayer(videoLayer)
-        videoLayer.isOpaque = true
         self.videoLayer = videoLayer
         print("layout, layer: \(videoLayer.frame)")
     }

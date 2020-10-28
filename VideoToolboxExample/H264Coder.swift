@@ -11,35 +11,6 @@ import CoreFoundation
 import CoreMedia
 import VideoToolbox
 
-struct EncodedSampleBuffer {
-    let formatDescription: CMFormatDescription
-    let sampleCount: CMItemCount
-    let bufferData: Data
-    let bufferDataLenght: Int
-    let timingInfo: CMSampleTimingInfo
-    let timingInfoCount: CMItemCount
-    let sizeArray: [Int]
-}
-
-extension EncodedSampleBuffer {
-
-    init(with sampleBuffer: CMSampleBuffer) {
-        formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer)!
-        sampleCount = CMSampleBufferGetNumSamples(sampleBuffer)
-        let blockBuffer = CMSampleBufferGetDataBuffer(sampleBuffer)!
-        let (data, bufferDataLenght) = H264Coder.getDataFrom(blockBuffer)
-        self.bufferDataLenght = bufferDataLenght
-        bufferData = data as Data
-        let (timingInfoPtr, timingInfoCount) = H264Coder.getTimingArray(sampleBuffer)
-        timingInfo = timingInfoPtr.pointee
-        self.timingInfoCount = timingInfoCount
-        let (sizeArrayPtr, sizeArrayCount) = H264Coder.getSizeArray(sampleBuffer)
-        let a = UnsafeMutableBufferPointer(start: sizeArrayPtr, count: sizeArrayCount)
-        sizeArray = Array(a)
-    }
-
-}
-
 class H264Coder {
 
     var session: VTCompressionSession?
@@ -65,13 +36,13 @@ class H264Coder {
             return
         }
 
-        guard let copied = copySB(sampleBuffer) else { return }
-        callback(sampleBuffer)
-        return
+        guard let copiedSampleBuffer = copySB(sampleBuffer) else { return }
 
-        array += [copied]
-        if array.count < 2 {
-            callback(copied)
+        // trying to store sample buffers in queue. it kind of works, but the video is distorted. getting lots of: GVA error: scheduleDecodeFrame kVTVideoDecoderBadDataErr nal_size err : nal_size = 2787177045, acc_size = 2787283463, datasize = 110145, video_nal_count = 1, length_offset = 4, nal_unit_type  = 9...
+
+        array += [copiedSampleBuffer]
+        if array.count < 20 {
+            callback(copiedSampleBuffer)
         } else {
             let element = array.removeFirst()
             callback(element)
@@ -86,7 +57,6 @@ class H264Coder {
         let copiedDataBuffer: UnsafeMutablePointer<CMBlockBuffer?> = .allocate(capacity: 1)
 
         let (data, length) = H264Coder.getDataFrom(blockBuffer)
-//        CMBlockBufferCreateWithMemoryBlock(nil, data.mutableBytes, length, kCFAllocatorNull, nil, 0, length, 0, copiedDataBuffer)
         print("retainedData", data)
         let nsData = NSMutableData(data: data)
         CMBlockBufferCreateEmpty (allocator: nil,capacity: 0,flags: kCMBlockBufferAlwaysCopyDataFlag, blockBufferOut: copiedDataBuffer)
@@ -106,8 +76,7 @@ class H264Coder {
         let retainedDataBuffer = Unmanaged.passRetained(copiedDataBuffer.pointee!)
         CMSampleBufferCreate(
             allocator: kCFAllocatorDefault, // allocator
-            dataBuffer: retainedDataBuffer.takeUnretainedValue(),
-            //            copiedDataBuffer.pointee, // dataBuffer
+            dataBuffer: retainedDataBuffer.takeRetainedValue(),
             dataReady: true, // dataReady
             makeDataReadyCallback: nil, // makeDataReadyCallback
             refcon: nil, // makeDataReadyRefcon
@@ -228,6 +197,36 @@ class H264Coder {
         let sizeArray = UnsafeMutablePointer<Int>.allocate(capacity: entriesCount)
         _ = CMSampleBufferGetSampleSizeArray(sampleBuffer, entryCount: entriesCount, arrayToFill: sizeArray, entriesNeededOut: &entriesCount)
         return (sizeArray, entriesCount)
+    }
+
+}
+
+// not used in current demo:
+struct EncodedSampleBuffer {
+    let formatDescription: CMFormatDescription
+    let sampleCount: CMItemCount
+    let bufferData: Data
+    let bufferDataLenght: Int
+    let timingInfo: CMSampleTimingInfo
+    let timingInfoCount: CMItemCount
+    let sizeArray: [Int]
+}
+
+extension EncodedSampleBuffer {
+
+    init(with sampleBuffer: CMSampleBuffer) {
+        formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer)!
+        sampleCount = CMSampleBufferGetNumSamples(sampleBuffer)
+        let blockBuffer = CMSampleBufferGetDataBuffer(sampleBuffer)!
+        let (data, bufferDataLenght) = H264Coder.getDataFrom(blockBuffer)
+        self.bufferDataLenght = bufferDataLenght
+        bufferData = data as Data
+        let (timingInfoPtr, timingInfoCount) = H264Coder.getTimingArray(sampleBuffer)
+        timingInfo = timingInfoPtr.pointee
+        self.timingInfoCount = timingInfoCount
+        let (sizeArrayPtr, sizeArrayCount) = H264Coder.getSizeArray(sampleBuffer)
+        let a = UnsafeMutableBufferPointer(start: sizeArrayPtr, count: sizeArrayCount)
+        sizeArray = Array(a)
     }
 
 }

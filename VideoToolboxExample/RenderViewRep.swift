@@ -63,9 +63,7 @@ class RenderView: MTKView {
     }
 
     override public func draw(_ rect: CGRect) {
-        autoreleasepool {
-            self.render()
-        }
+        self.render()
     }
 
     // disable error sound for key down events (space bar for play / pause)
@@ -81,11 +79,13 @@ class RenderView: MTKView {
         guard let ciImage = ciImage,
               let drawable = currentDrawable,
               let commandBuffer = commandQueue?.makeCommandBuffer() else { return }
+        withExtendedLifetime(ciImage) { () -> Void in
+            let renderDestination = CIRenderDestination(mtlTexture: drawable.texture, commandBuffer: commandBuffer)
+            let task = try? ciContext.startTask(toRender: ciImage, to: renderDestination)
+            commandBuffer.present(drawable)
+            commandBuffer.commit()
+            _ = try? task?.waitUntilCompleted()
+        }
 
-        let renderDestination = CIRenderDestination(mtlTexture: drawable.texture, commandBuffer: commandBuffer)
-        let task = try? ciContext.startTask(toRender: ciImage, to: renderDestination)
-        commandBuffer.present(drawable)
-        commandBuffer.commit()
-        _ = try? task?.waitUntilCompleted()
     }
 }

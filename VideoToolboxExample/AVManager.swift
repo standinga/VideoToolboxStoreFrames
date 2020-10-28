@@ -11,8 +11,6 @@ protocol AVManagerDelegate: class {
 
     func onSampleBuffer(_ sampleBuffer: CMSampleBuffer)
 
-    func didChangeFormat(_ format: AVCaptureDevice.Format)
-
 }
 
 class AVManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
@@ -30,8 +28,6 @@ class AVManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     private var connection: AVCaptureConnection!
 
     private var camera: AVCaptureDevice?
-
-    private var format640: AVCaptureDevice.Format?
 
     func start() {
         requestCameraPermission { [weak self] granted in
@@ -64,7 +60,6 @@ class AVManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
             do {
                 try camera.lockForConfiguration()
                 camera.activeFormat = format
-                self.format640 = format
                 camera.unlockForConfiguration()
             } catch {
                 print("failed to set up format")
@@ -124,14 +119,6 @@ class AVManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput,
                        didOutput sampleBuffer: CMSampleBuffer,
                        from connection: AVCaptureConnection) {
-        guard let camera = camera,
-              let format640 = format640 else { return }
-        if camera.activeFormat != format640 {
-            try? camera.lockForConfiguration()
-            camera.activeFormat = format640
-            camera.unlockForConfiguration()
-            delegate?.didChangeFormat(camera.activeFormat)
-        }
         delegate?.onSampleBuffer(sampleBuffer)
     }
 

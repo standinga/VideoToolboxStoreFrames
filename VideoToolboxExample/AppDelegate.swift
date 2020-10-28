@@ -57,6 +57,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, AVManagerDelegate {
 
     func onSampleBuffer(_ sampleBuffer: CMSampleBuffer) {
         cameraView.render(sampleBuffer)
+        guard let format = CMSampleBufferGetFormatDescription(sampleBuffer) else { return }
         if coder == nil,
            let formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer) {
             let dimens = formatDescription.dimensions
@@ -65,14 +66,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, AVManagerDelegate {
             })
         }
         coder?.encode(sampleBuffer)
-    }
-
-    func didChangeFormat(_ format: AVCaptureDevice.Format) {
-        print("didchangeformat")
-        coder?.stop()
-        coder = nil
-        decoder?.stop()
-        decoder = nil
     }
 
     private func decodeCompressedFrame(_ sampleBuffer: CMSampleBuffer) {
