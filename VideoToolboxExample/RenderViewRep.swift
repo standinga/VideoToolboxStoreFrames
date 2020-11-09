@@ -33,7 +33,7 @@ final class RenderViewRep: NSViewRepresentable {
 
 }
 
-class RenderView: MTKView {
+class RenderView: MTKView, MTKViewDelegate {
 
     private var ciImage: CIImage? {
         didSet {
@@ -51,19 +51,17 @@ class RenderView: MTKView {
 
     override init(frame frameRect: CGRect, device: MTLDevice?) {
         super.init(frame: frameRect, device: device)
-        wantsLayer = true
         if super.device == nil {
             fatalError("No metal")
         }
+        enableSetNeedsDisplay = true
         framebufferOnly = false
+        isPaused = true
+        delegate = self
     }
 
     required init(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
-    }
-
-    override public func draw(_ rect: CGRect) {
-        self.render()
     }
 
     // disable error sound for key down events (space bar for play / pause)
@@ -73,19 +71,24 @@ class RenderView: MTKView {
 
     func render(_ pixelBuffer: CVImageBuffer) {
         ciImage = CIImage(cvImageBuffer: pixelBuffer)
+        draw()
     }
 
-    private func render() {
+    // MARK: - NSViewRepresentable
+
+    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) { }
+
+    func draw(in view: MTKView) {
         guard let ciImage = ciImage,
               let drawable = currentDrawable,
               let commandBuffer = commandQueue?.makeCommandBuffer() else { return }
-        withExtendedLifetime(ciImage) { () -> Void in
-            let renderDestination = CIRenderDestination(mtlTexture: drawable.texture, commandBuffer: commandBuffer)
-            let task = try? ciContext.startTask(toRender: ciImage, to: renderDestination)
-            commandBuffer.present(drawable)
-            commandBuffer.commit()
-            _ = try? task?.waitUntilCompleted()
-        }
-
+        ciContext.render(ciImage,
+                         to: drawable.texture,
+              commandBuffer: commandBuffer,
+                     bounds: CGRect(origin: .zero, size: view.drawableSize),
+                 colorSpace: CGColorSpaceCreateDeviceRGB())
+        commandBuffer.present(drawable)
+        commandBuffer.commit()
     }
+
 }
